@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ユーザー操作画面</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyA9S9ZHfeZ0MFL32ihEJpndYvZKT_2rfJI",
+        authDomain: "ai-pretend.firebaseapp.com",
+        databaseURL: "https://ai-pretend-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "ai-pretend",
+        storageBucket: "ai-pretend.firebasestorage.app",
+        messagingSenderId: "248259351182",
+        appId: "1:248259351182:web:29b8f3d9a60069a8daefdf",
+        measurementId: "G-GD8KLC1VT6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const actionsRef = ref(db, 'actions');
+
+    // ボタンが押された時にデータを送信する関数をグローバルに登録
+    window.sendAction = function(actionType) {
+      const userNameInput = document.getElementById("username").value;
+      const userName = userNameInput ? userNameInput : "名無し";
+
+      push(actionsRef, {
+        user: userName,
+        action: actionType,
+        timestamp: Date.now()
+      });
+    };
+  </script>
+</head>
+<body>
+  <h1>操作パネル</h1>
+  <label>ユーザー名: <input type="text" id="username" placeholder="名前を入力"></label>
+  <hr>
+  <button onclick="sendAction('ログイン')">ログイン</button>
+  <button onclick="sendAction('攻撃')">攻撃</button>
+  <button onclick="sendAction('回復')">回復</button>
+</body>
+</html>

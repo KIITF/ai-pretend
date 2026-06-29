@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>メインゲーム画面</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getDatabase, ref, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyA9S9ZHfeZ0MFL32ihEJpndYvZKT_2rfJI",
+        authDomain: "ai-pretend.firebaseapp.com",
+        databaseURL: "https://ai-pretend-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "ai-pretend",
+        storageBucket: "ai-pretend.firebasestorage.app",
+        messagingSenderId: "248259351182",
+        appId: "1:248259351182:web:29b8f3d9a60069a8daefdf",
+        measurementId: "G-GD8KLC1VT6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const actionsRef = ref(db, 'actions');
+
+    // データベースにデータが追加された時の処理
+    onChildAdded(actionsRef, (snapshot) => {
+      const data = snapshot.val();
+      const logArea = document.getElementById("log");
+      const time = new Date(data.timestamp).toLocaleTimeString();
+      
+      const newElement = document.createElement("p");
+      newElement.textContent = `[${time}] ${data.user} が ${data.action} を実行しました。`;
+      logArea.prepend(newElement);
+    });
+  </script>
+</head>
+<body>
+  <h1>メイン画面</h1>
+  <div id="log" style="border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll;"></div>
+</body>
+</html>
