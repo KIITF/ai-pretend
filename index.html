@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>AIなりすまし</title>
+  <title>AIは誰だゲーム</title>
   <style>
     body { font-family: sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
     .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -21,12 +21,13 @@
     .meta-info { font-size: 0.85em; color: #555; display: flex; flex-wrap: wrap; gap: 15px; border-top: 1px dashed #eee; padding-top: 6px; }
     .author { color: #2563eb; font-weight: 600; }
     .voters { color: #d97706; }
+    #timer-display { font-size: 1.2em; font-weight: bold; color: #d32f2f; margin-bottom: 10px; }
   </style>
   <script type="module" src="./app.js"></script>
 </head>
 <body>
   <div class="container">
-    <h1>AIなりすまし</h1>
+    <h1>AIは誰だゲーム</h1>
     
     <div id="login-area" class="box">
       <p>名前を入力して参加してください</p>
@@ -45,6 +46,7 @@
       </div>
 
       <div class="box">
+        <div id="timer-display"></div>
         <p id="status-msg" style="font-weight: bold; color: #d32f2f;">待機中...</p>
         
         <div id="theme-input-area" class="hidden">
@@ -54,7 +56,10 @@
 
         <div id="answer-input-area" class="hidden">
           <div class="theme-box">お題: <span class="current-theme-display"></span></div>
-          <p>回答数: <span id="answer-count">0</span> / <span id="target-count">0</span> (AI: <span id="ai-status">待機中</span>)</p>
+          <p>回答数: <span id="answer-count">0</span> / <span id="target-count">0</span> 
+            (AI: <span id="ai-status">待機中</span>) 
+            <button id="retry-ai-btn" class="unobtrusive-btn hidden" onclick="retryAI()" style="color: #d32f2f;">AIを再生成</button>
+          </p>
           <div id="my-answer-form">
             <input type="text" id="my-answer-input" placeholder="あなたの回答を入力">
             <button onclick="submitAnswer()">回答を送信</button>
@@ -63,7 +68,7 @@
 
         <div id="guessing-area" class="hidden">
           <div class="theme-box">お題: <span class="current-theme-display"></span></div>
-          <p>AIの回答だと思うものを選択してください。</p>
+          <p>AIの回答だと思うものを選択してください（自分の回答を選ぶこともできます）。</p>
           <div id="guess-list"></div>
           <button id="submit-guess-btn" onclick="submitGuess()">予想を送信</button>
         </div>

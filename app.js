@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getDatabase, ref, set, onValue, onDisconnect, get, update, remove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-// ▼ ご自身の firebaseConfig に置き換えてください ▼
 const firebaseConfig = {
     apiKey: "AIzaSyA9S9ZHfeZ0MFL32ihEJpndYvZKT_2rfJI",
     authDomain: "ai-pretend.firebaseapp.com",
@@ -11,12 +10,36 @@ const firebaseConfig = {
     messagingSenderId: "248259351182",
     appId: "1:248259351182:web:29b8f3d9a60069a8daefdf",
     measurementId: "G-GD8KLC1VT6"
-  };
+};
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 let myName = "";
+let currentDeadline = 0;
+let currentPhase = '';
+const TIME_LIMIT_MS = 60000; // 60秒
+
+// タイマー監視ループ（1秒ごと）
+setInterval(() => {
+  if (currentPhase === 'answering' || currentPhase === 'guessing') {
+    if (currentDeadline > 0) {
+      const remain = Math.max(0, Math.ceil((currentDeadline - Date.now()) / 1000));
+      document.getElementById('timer-display').textContent = `残り時間: ${remain}秒`;
+      if (remain === 0) {
+        if (currentPhase === 'answering') {
+          const myForm = document.getElementById('my-answer-form');
+          if (!myForm.classList.contains('hidden')) window.submitAnswer(true);
+        } else if (currentPhase === 'guessing') {
+          const guessBtn = document.getElementById('submit-guess-btn');
+          if (!guessBtn.classList.contains('hidden')) window.submitGuess(true);
+        }
+      }
+    }
+  } else {
+    document.getElementById('timer-display').textContent = '';
+  }
+}, 1000);
 
 function shuffleArray(array) {
   const arr = [...array];
@@ -27,9 +50,17 @@ function shuffleArray(array) {
   return arr;
 }
 
-window.joinGame = function() {
-  const nameInput = document.getElementById('username').value;
+window.joinGame = async function() {
+  const nameInput = document.getElementById('username').value.trim();
   if (!nameInput) return;
+  
+  const snap = await get(ref(db, 'users'));
+  const users = snap.val() || {};
+  
+  if (users[nameInput]) {
+    alert("その名前はすでに使われています。別の名前を入力してください。");
+    return;
+  }
   
   myName = nameInput;
   const userRef = ref(db, 'users/' + myName);
@@ -40,77 +71,80 @@ window.joinGame = function() {
   document.getElementById('game-area').classList.remove('hidden');
 };
 
-// 参加者数の変動を検知し、進行チェックを行う（離脱対策）
 onValue(ref(db, 'users'), () => {
   checkAllAnswered();
   checkAllGuessed();
 });
 
 window.resetScores = function() {
-  if (confirm('本当に全員のスコアをリセットしますか？')) {
-    remove(ref(db, 'scores'));
-  }
+  if (confirm('本当に全員のスコアをリセットしますか？')) remove(ref(db, 'scores'));
 };
 
-// ラウンドのリセット（スコアは維持）
 window.resetRound = function() {
-  if (confirm('進行状況をリセットして待機中画面に戻りますか？（スコアはそのままです）')) {
-    update(ref(db), {
-      'game/phase': 'waiting',
-      'answers': null,
-      'guesses': null
-    });
+  if (confirm('進行状況をリセットして待機中画面に戻りますか？')) {
+    update(ref(db), { 'game/phase': 'waiting', 'answers': null, 'guesses': null });
   }
 };
 
 window.startGame = async function() {
-  const snapshot = await get(ref(db, 'users'));
-  const users = snapshot.val() || {};
-  const userNames = Object.keys(users);
+  const snapshot = await get(ref(db));
+  const data = snapshot.val() || {};
+  const users = data.users || {};
+  const userNames = Object.keys(users).sort(); // 名前順で固定
   if (userNames.length === 0) return;
 
-  const randomName = userNames[Math.floor(Math.random() * userNames.length)];
+  const lastThemeMaker = (data.game && data.game.themeMaker) ? data.game.themeMaker : "";
+  let nextIndex = 0;
+  if (lastThemeMaker && userNames.includes(lastThemeMaker)) {
+    nextIndex = (userNames.indexOf(lastThemeMaker) + 1) % userNames.length;
+  }
+  const nextThemeMaker = userNames[nextIndex];
   
-  // 1. 前回の回答、予想、シャッフルデータを根こそぎ完全に削除
   await remove(ref(db, 'answers'));
   await remove(ref(db, 'guesses'));
   
-  // 2. ゲーム状態を初期化して、新しいお題担当者を設定
   const updates = {
     'game': { 
       phase: 'theme_input', 
-      themeMaker: randomName, 
+      themeMaker: nextThemeMaker, 
       theme: '', 
       aiStatus: 'waiting',
       aiAnswer: '',
-      shuffledAnswers: null 
+      shuffledAnswers: null,
+      deadline: 0
     }
   };
   await update(ref(db), updates);
 
-  // 3. 入力フォームの非表示状態をリセットするため、念のため画面要素もクリア
   const myAnswerInput = document.getElementById('my-answer-input');
   if (myAnswerInput) myAnswerInput.value = '';
-  
   const themeInput = document.getElementById('theme-input');
   if (themeInput) themeInput.value = '';
-  
-  const submitGuessBtn = document.getElementById('submit-guess-btn');
-  if (submitGuessBtn) submitGuessBtn.classList.add('hidden');
 };
 
 window.submitTheme = async function() {
-  const theme = document.getElementById('theme-input').value;
+  const theme = document.getElementById('theme-input').value.trim();
   if (!theme) return;
   
-  set(ref(db, 'game'), {
+  // AIの完了を待たず、すぐに回答フェーズへ移行してタイマーをスタート
+  await update(ref(db, 'game'), {
     phase: 'answering',
     themeMaker: myName,
     theme: theme,
-    aiStatus: 'generating'
+    aiStatus: 'generating',
+    aiAnswer: '',
+    deadline: Date.now() + TIME_LIMIT_MS
   });
 
-  const geminiApiKey = "AQ.Ab8RN6Lav65WHM7_hmhuUKS6GJ-jSZoNb49F7u3pYj-nFTKHkQ";
+  // 非同期でAIの生成を開始
+  generateAIAnswer(theme);
+};
+
+// AI生成処理を切り出し
+window.generateAIAnswer = async function(theme) {
+  await update(ref(db, 'game/aiStatus'), 'generating');
+
+  const geminiApiKey = "GEMINI_API_KEY_PLACEHOLDER";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
   const promptText = `
 お題「${theme}」に対して明確な答えを2文以下で簡潔に答えてください。
@@ -122,15 +156,32 @@ window.submitTheme = async function() {
 - 回答のみを出力してください。
 `;
 
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
-    });
-    const data = await response.json();
-    const aiText = data.candidates[0].content.parts[0].text.trim();
+  let retries = 3;
+  let aiText = "";
+  let success = false;
+  
+  while (retries > 0) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+      });
+      if (!response.ok) throw new Error("HTTP Status: " + response.status);
+      const data = await response.json();
+      aiText = data.candidates[0].content.parts[0].text.trim();
+      success = true;
+      break; 
+    } catch (error) {
+      retries--;
+      console.error(`Gemini Error (残りリトライ${retries}回):`, error);
+      if (retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+  }
 
+  if (success) {
     const sentences = aiText.split(/(?<=[。！？\n])/).map(s => s.trim()).filter(s => s.length > 0);
     let displayText = "";
     if (sentences.length > 0) {
@@ -145,16 +196,39 @@ window.submitTheme = async function() {
 
     await update(ref(db, 'game'), { aiAnswer: displayText, aiStatus: 'done' });
     checkAllAnswered();
-  } catch (error) {
-    console.error("Gemini Error:", error);
-    await update(ref(db, 'game'), { aiAnswer: "エラーが発生しました", aiStatus: 'done' });
-    checkAllAnswered();
+  } else {
+    // 完全に失敗した場合はエラーステータスを記録
+    await update(ref(db, 'game/aiStatus'), 'error');
   }
 };
 
-window.submitAnswer = async function() {
-  const answer = document.getElementById('my-answer-input').value;
-  if (!answer) return;
+// 再生成ボタンが押された時の処理
+window.retryAI = async function() {
+  const snapshot = await get(ref(db, 'game'));
+  const game = snapshot.val();
+  if (game && game.theme) {
+    generateAIAnswer(game.theme);
+  }
+};
+
+window.submitAnswer = async function(isTimeout = false) {
+  let answer = document.getElementById('my-answer-input').value.trim();
+  
+  if (isTimeout && !answer) {
+    answer = "時間切れ";
+  } else if (!answer) {
+    return;
+  }
+  
+  if (!isTimeout) {
+    const snap = await get(ref(db, 'answers'));
+    const answers = snap.val() || {};
+    if (Object.values(answers).includes(answer)) {
+      alert("その回答はすでに出ています。別の回答にしてください。");
+      return;
+    }
+  }
+  
   await set(ref(db, `answers/${myName}`), answer);
   document.getElementById('my-answer-form').classList.add('hidden');
   checkAllAnswered();
@@ -178,18 +252,25 @@ async function checkAllAnswered() {
     
     await update(ref(db, 'game'), {
       phase: 'guessing',
-      shuffledAnswers: shuffled
+      shuffledAnswers: shuffled,
+      deadline: Date.now() + TIME_LIMIT_MS
     });
   }
 }
 
-window.submitGuess = async function() {
+window.submitGuess = async function(isTimeout = false) {
   const radios = document.getElementsByName('guess-radio');
   let selected = "";
   for (const radio of radios) {
     if (radio.checked) selected = radio.value;
   }
-  if (!selected) return;
+  
+  if (isTimeout && !selected) {
+    // 時間切れで未選択の場合は適当なものを選択
+    if (radios.length > 0) selected = radios[Math.floor(Math.random() * radios.length)].value;
+  } else if (!selected) {
+    return;
+  }
 
   await set(ref(db, `guesses/${myName}`), selected);
   document.getElementById('submit-guess-btn').classList.add('hidden');
@@ -228,11 +309,10 @@ async function checkAllGuessed() {
     if (Object.keys(scoreUpdates).length > 0) {
       await update(ref(db), scoreUpdates);
     }
-    await set(ref(db, 'game/phase'), 'result');
+    await update(ref(db, 'game'), { phase: 'result', deadline: 0 });
   }
 }
 
-// 画面の描画
 onValue(ref(db), (snapshot) => {
   const data = snapshot.val();
   if (!data || !data.game) return;
@@ -241,6 +321,9 @@ onValue(ref(db), (snapshot) => {
   const answers = data.answers || {};
   const guesses = data.guesses || {};
   const scores = data.scores || {};
+
+  currentPhase = game.phase || '';
+  currentDeadline = game.deadline || 0;
 
   const userCount = Object.keys(users).length;
   document.getElementById('user-count').textContent = userCount;
@@ -269,7 +352,6 @@ onValue(ref(db), (snapshot) => {
 
   document.querySelectorAll('.current-theme-display').forEach(el => el.textContent = game.theme);
 
-  // フェーズが guessing 以外の時はラジオボタンを初期化しておく
   if (game.phase !== 'guessing') {
     guessList.innerHTML = '';
   }
@@ -305,20 +387,30 @@ onValue(ref(db), (snapshot) => {
     
     document.getElementById('target-count').textContent = userCount;
     document.getElementById('answer-count').textContent = Object.keys(answers).length;
-    document.getElementById('ai-status').textContent = game.aiStatus === 'done' ? "完了" : "生成中...";
-
-    // ★修正: まだ回答していない人だけフォームを表示し、入力欄を空にする
-    if (!answers[myName]) {
-      const myAnswerInput = document.getElementById('my-answer-input');
-      // 前回のゲームの文字が残っていたら消す
-      if (myAnswerInput && !data.guesses) { 
-        // 予想（guesses）データがない＝新しいラウンドが始まった直後のみクリア
-        myAnswerInput.value = '';
-      }
-      document.getElementById('my-answer-form').classList.remove('hidden');
+    
+    // AIのステータス表示と再生成ボタンの制御
+    const aiStatusEl = document.getElementById('ai-status');
+    const retryAiBtn = document.getElementById('retry-ai-btn');
+    
+    if (game.aiStatus === 'done') {
+      aiStatusEl.textContent = "完了";
+      retryAiBtn.classList.add('hidden');
+    } else if (game.aiStatus === 'error') {
+      aiStatusEl.textContent = "エラー発生";
+      retryAiBtn.classList.remove('hidden');
     } else {
-      // すでに回答済みの場合はフォームを隠す
-      document.getElementById('my-answer-form').classList.add('hidden');
+      aiStatusEl.textContent = "生成中...";
+      retryAiBtn.classList.add('hidden');
+    }
+
+    const myAnswerForm = document.getElementById('my-answer-form');
+    if (!answers[myName]) {
+      if (myAnswerForm.classList.contains('hidden')) {
+        document.getElementById('my-answer-input').value = '';
+        myAnswerForm.classList.remove('hidden');
+      }
+    } else {
+      myAnswerForm.classList.add('hidden');
     }
   }
   else if (game.phase === 'guessing') {
@@ -326,7 +418,6 @@ onValue(ref(db), (snapshot) => {
     guessingArea.classList.remove('hidden');
     statusMsg.textContent = `全員の回答が出揃いました！AIの回答を予想してください。（予想済み: ${Object.keys(guesses).length} 人）`;
 
-    // ★選択が消える問題の対策：まだ生成されていない場合のみHTMLを描画する
     if (guessList.innerHTML === '') {
       if (game.shuffledAnswers) {
         game.shuffledAnswers.forEach((ans) => {
@@ -355,9 +446,7 @@ onValue(ref(db), (snapshot) => {
     const getVotersHtml = (targetAnswer) => {
       const voters = [];
       for (const [guesser, guessText] of Object.entries(guesses)) {
-        if (guessText === targetAnswer) {
-          voters.push(guesser);
-        }
+        if (guessText === targetAnswer) voters.push(guesser);
       }
       return voters.length > 0 ? `👉<strong>${voters.join(', ')}</strong>` : "👉<strong>なし</strong>";
     };
