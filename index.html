@@ -2,40 +2,81 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>メインゲーム画面</title>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getDatabase, ref, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyA9S9ZHfeZ0MFL32ihEJpndYvZKT_2rfJI",
-        authDomain: "ai-pretend.firebaseapp.com",
-        databaseURL: "https://ai-pretend-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "ai-pretend",
-        storageBucket: "ai-pretend.firebasestorage.app",
-        messagingSenderId: "248259351182",
-        appId: "1:248259351182:web:29b8f3d9a60069a8daefdf",
-        measurementId: "G-GD8KLC1VT6"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const actionsRef = ref(db, 'actions');
-
-    // データベースにデータが追加された時の処理
-    onChildAdded(actionsRef, (snapshot) => {
-      const data = snapshot.val();
-      const logArea = document.getElementById("log");
-      const time = new Date(data.timestamp).toLocaleTimeString();
-      
-      const newElement = document.createElement("p");
-      newElement.textContent = `[${time}] ${data.user} が ${data.action} を実行しました。`;
-      logArea.prepend(newElement);
-    });
-  </script>
+  <title>AIは誰だゲーム</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    input[type="text"] { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+    button { padding: 10px 16px; margin: 5px 0; cursor: pointer; background-color: #0078d4; color: white; border: none; border-radius: 4px; }
+    button:hover { background-color: #005a9e; }
+    .hidden { display: none !important; }
+    .box { border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 15px; border-radius: 6px; }
+    .unobtrusive-btn { background: none; border: none; color: #888; text-decoration: underline; font-size: 0.8em; cursor: pointer; padding: 0; display: inline; margin-left: 10px; }
+    ul { padding-left: 20px; }
+    .radio-label { display: block; margin-bottom: 8px; cursor: pointer; }
+    .theme-box { background-color: #eef7ff; padding: 10px 15px; border-left: 5px solid #0078d4; font-weight: bold; margin-bottom: 20px; }
+    .result-item { border: 1px solid #e0e0e0; padding: 12px; margin-bottom: 10px; border-radius: 6px; background-color: #fff; }
+    .result-item.ai-correct { border-color: #a3e635; background-color: #f7fee7; }
+    .answer-text { font-size: 1.1em; font-weight: bold; margin-bottom: 6px; color: #111; }
+    .meta-info { font-size: 0.85em; color: #555; display: flex; flex-wrap: wrap; gap: 15px; border-top: 1px dashed #eee; padding-top: 6px; }
+    .author { color: #2563eb; font-weight: 600; }
+    .voters { color: #d97706; }
+  </style>
+  <script type="module" src="./app.js"></script>
 </head>
 <body>
-  <h1>メイン画面</h1>
-  <div id="log" style="border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll;"></div>
+  <div class="container">
+    <h1>AIは誰だゲーム</h1>
+    
+    <div id="login-area" class="box">
+      <p>名前を入力して参加してください</p>
+      <input type="text" id="username" placeholder="名前を入力">
+      <button onclick="joinGame()">参加する</button>
+    </div>
+
+    <div id="game-area" class="hidden">
+      <div class="box">
+        <h3>参加者 (<span id="user-count">0</span>人) とスコア</h3>
+        <ul id="score-list"></ul>
+        <div>
+          <button id="reset-scores-btn" class="unobtrusive-btn hidden" onclick="resetScores()">スコアを全リセット</button>
+          <button id="reset-round-btn" class="unobtrusive-btn hidden" onclick="resetRound()">ラウンドをやり直す</button>
+        </div>
+      </div>
+
+      <div class="box">
+        <p id="status-msg" style="font-weight: bold; color: #d32f2f;">待機中...</p>
+        
+        <div id="theme-input-area" class="hidden">
+          <input type="text" id="theme-input" placeholder="お題を入力">
+          <button onclick="submitTheme()">お題を決定する</button>
+        </div>
+
+        <div id="answer-input-area" class="hidden">
+          <div class="theme-box">お題: <span class="current-theme-display"></span></div>
+          <p>回答数: <span id="answer-count">0</span> / <span id="target-count">0</span> (AI: <span id="ai-status">待機中</span>)</p>
+          <div id="my-answer-form">
+            <input type="text" id="my-answer-input" placeholder="あなたの回答を入力">
+            <button onclick="submitAnswer()">回答を送信</button>
+          </div>
+        </div>
+
+        <div id="guessing-area" class="hidden">
+          <div class="theme-box">お題: <span class="current-theme-display"></span></div>
+          <p>AIの回答だと思うものを選択してください（自分の回答を選ぶこともできます）。</p>
+          <div id="guess-list"></div>
+          <button id="submit-guess-btn" onclick="submitGuess()">予想を送信</button>
+        </div>
+
+        <div id="result-area" class="hidden">
+          <div class="theme-box">お題: <span class="current-theme-display"></span></div>
+          <div id="result-details"></div>
+          <button id="next-game-btn" class="hidden" onclick="startGame()">次のゲームへ</button>
+        </div>
+        
+        <button id="start-btn" class="hidden" onclick="startGame()">ゲームスタート</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
