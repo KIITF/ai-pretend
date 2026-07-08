@@ -140,11 +140,11 @@ window.submitTheme = async function() {
   generateAIAnswer(theme);
 };
 
-// AI生成処理を切り出し
 window.generateAIAnswer = async function(theme) {
-  await update(ref(db, 'game/aiStatus'), 'generating');
+  // 修正箇所1: オブジェクト形式で渡す
+  await update(ref(db, 'game'), { aiStatus: 'generating' });
 
-  const geminiApiKey = "GEMINI_API_KEY_PLACEHOLDER";
+  const geminiApiKey = "AQ.Ab8RN6Lav65WHM7_hmhuUKS6GJ-jSZoNb49F7u3pYj-nFTKHkQ";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
   const promptText = `
 お題「${theme}」に対して明確な答えを2文以下で簡潔に答えてください。
@@ -197,8 +197,8 @@ window.generateAIAnswer = async function(theme) {
     await update(ref(db, 'game'), { aiAnswer: displayText, aiStatus: 'done' });
     checkAllAnswered();
   } else {
-    // 完全に失敗した場合はエラーステータスを記録
-    await update(ref(db, 'game/aiStatus'), 'error');
+    // 修正箇所2: オブジェクト形式で渡す
+    await update(ref(db, 'game'), { aiStatus: 'error' });
   }
 };
 
