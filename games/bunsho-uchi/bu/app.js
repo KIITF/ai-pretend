@@ -3,8 +3,6 @@ import { db } from "../../firebase-config.js";
 
 let myName = "";
 let opponentName = "";
-let cachedTurn = 0;
-let cachedChoices = [];
 
 const DB_PATH = 'bunsho_uchi';
 
@@ -93,14 +91,6 @@ function updateUI(game) {
     const isMyTurn = game.currentPlayer === myName;
     const myN = getOpenCount(game, myName);
     const oppN = getOpenCount(game, opponentName);
-    const currentTurn = game.turns && game.turns[myName] ? game.turns[myName] : 1;
-
-    if (game.lyrics && game.lyrics[opponentName]) {
-      document.getElementById('my-total-length').textContent = game.lyrics[opponentName].length;
-    }
-    if (game.lyrics && game.lyrics[myName]) {
-      document.getElementById('opp-total-length').textContent = game.lyrics[myName].length;
-    }
 
     const mySection = document.getElementById('my-board-section');
     const oppSection = document.getElementById('opponent-board-section');
@@ -108,33 +98,26 @@ function updateUI(game) {
     const oppIndicator = document.getElementById('opponent-turn-indicator');
 
     if (isMyTurn) {
-      document.getElementById('turn-status').textContent = `自分のターン (${myN}文字開けます)`;
+      document.getElementById('turn-status').textContent = `自分のターン (${myN}文字)`;
       
-      mySection.classList.add('active');
-      oppSection.classList.remove('active');
-      myIndicator.classList.remove('hidden');
-      oppIndicator.classList.add('hidden');
+      if (mySection) mySection.classList.add('active');
+      if (oppSection) oppSection.classList.remove('active');
+      if (myIndicator) myIndicator.classList.remove('hidden');
+      if (oppIndicator) oppIndicator.classList.add('hidden');
 
-      if (cachedTurn !== currentTurn) {
-        cachedChoices = generateChoices(game.lyrics[opponentName], game.masks[opponentName], myN);
-        cachedTurn = currentTurn;
-      }
-
-      renderBoard('my-guess-board', game.lyrics[opponentName], game.masks[opponentName], true, myN, opponentName, cachedChoices);
-      renderBoard('opponent-guess-board', game.lyrics[myName], game.masks[myName], false, oppN, myName, []);
-
+      renderBoard('my-guess-board', game.lyrics[opponentName], game.masks[opponentName], true, myN, opponentName);
+      renderBoard('opponent-guess-board', game.lyrics[myName], game.masks[myName], false, oppN, myName);
     } else {
-      document.getElementById('turn-status').textContent = `相手のターン (${oppN}文字開けます)`;
+      document.getElementById('turn-status').textContent = `相手のターン (${oppN}文字)`;
       
-      oppSection.classList.add('active');
-      mySection.classList.remove('active');
-      oppIndicator.classList.remove('hidden');
-      myIndicator.classList.add('hidden');
+      if (oppSection) oppSection.classList.add('active');
+      if (mySection) mySection.classList.remove('active');
+      if (oppIndicator) oppIndicator.classList.remove('hidden');
+      if (myIndicator) myIndicator.classList.add('hidden');
 
-      renderBoard('my-guess-board', game.lyrics[opponentName], game.masks[opponentName], false, myN, opponentName, []);
-      renderBoard('opponent-guess-board', game.lyrics[myName], game.masks[myName], false, oppN, myName, []);
+      renderBoard('my-guess-board', game.lyrics[opponentName], game.masks[opponentName], false, myN, opponentName);
+      renderBoard('opponent-guess-board', game.lyrics[myName], game.masks[myName], false, oppN, myName);
     }
-
   } else {
     document.getElementById('playing-area').classList.add('hidden');
   }
@@ -148,7 +131,7 @@ window.submitLyrics = async function() {
   
   const mask = Array(text.length).fill(false);
   for (let i = 0; i < text.length; i++) {
-    if (/\s/.test(text[i])) {
+    if (text[i] === ' ' || text[i] === ' ' || text[i] === '\n') {
       mask[i] = true;
     }
   }
@@ -165,13 +148,12 @@ window.submitLyrics = async function() {
   }
 };
 
-function generateChoices(text, mask, n) {
-  let validChoices = [];
-  
+function getSelectableIndices(text, mask, n) {
+  let selectable = Array(text.length).fill(false);
+  let foundAny = false;
+
   for (let dist = 3; dist >= 0; dist--) {
-    let choices = [];
-    
-    for (let i = 5; i < text.length; i++) {
+    for (let i = 0; i < text.length; i++) {
       if (mask[i]) continue;
 
       let openedCount = 0;
@@ -182,13 +164,11 @@ function generateChoices(text, mask, n) {
           endIdx = j;
         }
       }
-      
-      if (openedCount < n) continue;
 
       let isValid = true;
       for (let k = i - dist; k <= endIdx + dist; k++) {
         if (k >= 0 && k < text.length) {
-          if (mask[k] && !/\s/.test(text[k])) {
+          if (mask[k] && text[k] !== ' ' && text[k] !== ' ' && text[k] !== '\n') {
             isValid = false;
             break;
           }
@@ -196,26 +176,25 @@ function generateChoices(text, mask, n) {
       }
 
       if (isValid) {
-        choices.push({ start: i, end: endIdx });
+        selectable[i] = true;
+        foundAny = true;
       }
     }
-    
-    if (choices.length > 0) {
-      validChoices = choices;
-      break;
-    }
+    if (foundAny) break;
   }
-
-  return validChoices.sort(() => 0.5 - Math.random()).slice(0, 3);
+  return selectable;
 }
 
-function renderBoard(containerId, text, mask, isInteractive, n, targetPlayer, choices = []) {
+function renderBoard(containerId, text, mask, isInteractive, n, targetPlayer) {
   const container = document.getElementById(containerId);
-  if (!container) return;
+  if (!container) return; 
   container.innerHTML = '';
   if (!text) return;
 
-  const choiceStarts = choices.map(c => c.start);
+  let selectableIndices = [];
+  if (isInteractive) {
+    selectableIndices = getSelectableIndices(text, mask, n);
+  }
 
   for (let i = 0; i < text.length; i++) {
     const charDiv = document.createElement('div');
@@ -236,23 +215,20 @@ function renderBoard(containerId, text, mask, isInteractive, n, targetPlayer, ch
       charDiv.classList.add('opened');
     } else {
       charDiv.textContent = '';
-      
-      if (isInteractive && choiceStarts.includes(i)) {
-        const choice = choices.find(c => c.start === i);
-        charDiv.classList.add('choice-highlight');
-        
-        charDiv.onmouseenter = () => highlight(containerId, choice.start, n, text.length, mask);
-        charDiv.onmouseleave = () => clearHighlight(containerId);
-        charDiv.onclick = () => window.openChars(choice.start, choice.end, targetPlayer);
-      } else if (isInteractive) {
-        charDiv.style.cursor = 'not-allowed';
+      if (isInteractive) {
+        if (selectableIndices[i]) {
+          charDiv.classList.add('selectable');
+          charDiv.onmouseenter = () => highlight(containerId, i, n, text.length, mask);
+          charDiv.onmouseleave = () => clearHighlight(containerId);
+          charDiv.onclick = () => window.openChars(i, n, text.length, mask, targetPlayer);
+        } else {
+          charDiv.style.cursor = 'not-allowed';
+          charDiv.style.opacity = '0.4';
+        }
       }
     }
     container.appendChild(charDiv);
   }
-
-  // 描画後、少し待ってからスクロール矢印の判定を行う
-  setTimeout(checkScrollIndicators, 50);
 }
 
 function highlight(containerId, startIdx, n, len, mask) {
@@ -277,59 +253,21 @@ function clearHighlight(containerId) {
   }
 }
 
-window.openChars = async function(startIdx, endIdx, targetPlayer) {
-  const snap = await get(ref(db, `${DB_PATH}/game`));
-  const game = snap.val();
-  const text = game.lyrics[targetPlayer];
-  let mask = game.masks[targetPlayer] || Array(text.length).fill(false);
-  let newMask = [...mask];
-
-  for (let i = startIdx; i <= endIdx; i++) {
-    newMask[i] = true;
+window.openChars = async function(startIdx, n, len, mask, targetPlayer) {
+  let opened = 0;
+  let newMask = [...(mask || Array(len).fill(false))];
+  for (let i = startIdx; i < len && opened < n; i++) {
+    if (!newMask[i]) {
+      newMask[i] = true;
+      opened++;
+    }
   }
   
+  const snap = await get(ref(db, `${DB_PATH}/game`));
+  const game = snap.val();
   const currentTurn = game.turns[myName] || 1;
 
   await update(ref(db, `${DB_PATH}/game/masks`), { [targetPlayer]: newMask });
   await update(ref(db, `${DB_PATH}/game/turns`), { [myName]: currentTurn + 1 });
   await update(ref(db, `${DB_PATH}/game`), { currentPlayer: opponentName });
 };
-
-// スクロール状態をチェックして矢印の表示・非表示を切り替える処理
-function checkScrollIndicators() {
-  const upArrow = document.getElementById('scroll-arrow-up');
-  const downArrow = document.getElementById('scroll-arrow-down');
-  if (!upArrow || !downArrow) return;
-
-  const choices = document.querySelectorAll('.choice-highlight');
-  if (choices.length === 0) {
-    upArrow.classList.add('hidden');
-    downArrow.classList.add('hidden');
-    return;
-  }
-
-  let needsUp = false;
-  let needsDown = false;
-
-  choices.forEach(choice => {
-    const rect = choice.getBoundingClientRect();
-    // 画面上部から見切れているか
-    if (rect.top < 0) {
-      needsUp = true;
-    }
-    // 画面下部から見切れているか
-    if (rect.bottom > window.innerHeight) {
-      needsDown = true;
-    }
-  });
-
-  if (needsUp) upArrow.classList.remove('hidden');
-  else upArrow.classList.add('hidden');
-
-  if (needsDown) downArrow.classList.remove('hidden');
-  else downArrow.classList.add('hidden');
-}
-
-// スクロールおよびリサイズ時にも矢印の表示を更新する
-window.addEventListener('scroll', checkScrollIndicators);
-window.addEventListener('resize', checkScrollIndicators);

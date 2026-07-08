@@ -32,45 +32,10 @@
       box-sizing: border-box;
     }
     .char-box.opened { background: #fff; border-color: #0078d4; color: #0078d4; font-weight: bold; }
+    .char-box.selectable { cursor: pointer; background: #e0e0e0; }
+    .char-box.selectable:hover { background: #e0e0e0; }
+    .char-box.preview-open { background: #ffeb3b !important; }
     
-    .char-box.preview-open { background: #ffeb3b !important; border-color: #fbc02d; }
-
-    /* アニメーションを削除し、常に黄色く目立つスタイルに変更 */
-    .char-box.choice-highlight { 
-      background-color: #ffeb3b; 
-      box-shadow: 0 0 8px #fbc02d; 
-      border-color: #fbc02d;
-      cursor: pointer; 
-      position: relative;
-    }
-    .char-box.choice-highlight:hover { 
-      background-color: #fbc02d !important; 
-      transform: scale(1.1); 
-      z-index: 20;
-    }
-
-    /* 画面外のマスを示すスクロール矢印 */
-    .scroll-arrow {
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 2.5em;
-      color: #fbc02d;
-      background: rgba(255, 255, 255, 0.9);
-      border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      z-index: 1000;
-      pointer-events: none; /* マウス操作を邪魔しないようにする */
-      transition: opacity 0.2s;
-    }
-    .scroll-arrow.up { top: 20px; }
-    .scroll-arrow.down { bottom: 20px; }
-
     input[type="text"], textarea { 
       padding: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; 
       border: 1px solid #ccc; border-radius: 4px; font-size: 1em; font-family: sans-serif;
@@ -85,9 +50,6 @@
   </style>
 </head>
 <body>
-  <div id="scroll-arrow-up" class="scroll-arrow up hidden">▲</div>
-  <div id="scroll-arrow-down" class="scroll-arrow down hidden">▼</div>
-
   <div class="container">
     <h1>文章撃ち (1v1)</h1>
 
@@ -103,8 +65,8 @@
     </div>
 
     <div id="lyrics-input-area" class="box hidden">
-      <p>お題を入力（最大500文字）</p>
-      <textarea id="my-lyrics" rows="4" maxlength="500"></textarea>
+      <p>お題を入力</p>
+      <textarea id="my-lyrics" rows="4"></textarea>
       <button onclick="submitLyrics()">決定</button>
       <p id="waiting-opponent-msg" class="hidden" style="color: #d32f2f;">待機中...</p>
     </div>
@@ -114,14 +76,14 @@
       
       <div class="boards-container">
         <div id="my-board-section" class="board-section">
-          <div id="my-turn-indicator" class="turn-indicator hidden">↑ 黄色いマスを選んで開ける ↑</div>
-          <h3>あなたが推測する文章（全<span id="my-total-length">-</span>文字）</h3>
+          <div id="my-turn-indicator" class="turn-indicator hidden">↑ 今ここを開ける ↑</div>
+          <h3>あなたが推測する文章</h3>
           <div id="my-guess-board" class="char-board"></div>
         </div>
 
         <div id="opponent-board-section" class="board-section">
           <div id="opponent-turn-indicator" class="turn-indicator opponent hidden">↑ 相手が操作中 ↑</div>
-          <h3>相手が推測中の文章（全<span id="opp-total-length">-</span>文字）</h3>
+          <h3>相手が推測する文章</h3>
           <div id="opponent-guess-board" class="char-board"></div>
         </div>
       </div>
