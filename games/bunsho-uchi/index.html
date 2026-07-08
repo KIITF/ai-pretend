@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>文章撃ち</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
+    .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .hidden { display: none !important; }
+    .box { border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 15px; border-radius: 6px; }
+    
+    .boards-container { display: flex; gap: 20px; margin-bottom: 20px; align-items: flex-start; }
+    .board-section { 
+      flex: 1; padding: 20px; border: 2px solid #ddd; border-radius: 8px; position: relative; 
+      background-color: #fafafa; transition: all 0.3s ease;
+    }
+    .board-section.active { border-color: #0078d4; background-color: #f0f8ff; box-shadow: 0 0 10px rgba(0,120,212,0.2); }
+    
+    .turn-indicator { 
+      position: absolute; top: -14px; left: 50%; transform: translateX(-50%); 
+      background: #0078d4; color: white; padding: 4px 16px; border-radius: 12px; 
+      font-size: 0.9em; font-weight: bold; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .turn-indicator.opponent { background: #d32f2f; }
+    
+    .char-board { display: flex; flex-wrap: wrap; gap: 4px; font-size: 1.2em; }
+    .char-box { 
+      width: 28px; height: 36px; 
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid #ccc; border-radius: 4px; background: #f0f0f0; 
+      cursor: default; user-select: none;
+      box-sizing: border-box;
+    }
+    .char-box.opened { background: #fff; border-color: #0078d4; color: #0078d4; font-weight: bold; }
+    .char-box.selectable { cursor: pointer; background: #e0e0e0; }
+    .char-box.selectable:hover { background: #e0e0e0; }
+    .char-box.preview-open { background: #ffeb3b !important; }
+    
+    input[type="text"], textarea { 
+      padding: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; 
+      border: 1px solid #ccc; border-radius: 4px; font-size: 1em; font-family: sans-serif;
+    }
+    textarea { resize: vertical; line-height: 1.4; }
+    
+    button { padding: 8px 16px; cursor: pointer; background-color: #0078d4; color: white; border: none; border-radius: 4px; }
+    button:hover { background-color: #005a9e; }
+    
+    h2, h3 { margin-top: 0; color: #333; text-align: center; }
+    h3 { font-size: 1.1em; margin-bottom: 15px; color: #555; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>文章撃ち (1v1)</h1>
+
+    <button onclick="forceReset()" style="background-color: #d32f2f; margin-bottom: 15px;">リセット</button>
+
+    <div id="login-area" class="box">
+      <input type="text" id="username" placeholder="名前">
+      <button onclick="joinGame()">参加</button>
+    </div>
+
+    <div id="waiting-players-area" class="box hidden">
+      <p style="color: #0078d4; font-weight: bold;">待機中...</p>
+    </div>
+
+    <div id="lyrics-input-area" class="box hidden">
+      <p>お題を入力</p>
+      <textarea id="my-lyrics" rows="4"></textarea>
+      <button onclick="submitLyrics()">決定</button>
+      <p id="waiting-opponent-msg" class="hidden" style="color: #d32f2f;">待機中...</p>
+    </div>
+
+    <div id="playing-area" class="box hidden">
+      <h2 id="turn-status" style="color: #0078d4; margin-bottom: 25px;"></h2>
+      
+      <div class="boards-container">
+        <div id="my-board-section" class="board-section">
+          <div id="my-turn-indicator" class="turn-indicator hidden">↑ 今ここを開ける ↑</div>
+          <h3>あなたが推測する文章</h3>
+          <div id="my-guess-board" class="char-board"></div>
+        </div>
+
+        <div id="opponent-board-section" class="board-section">
+          <div id="opponent-turn-indicator" class="turn-indicator opponent hidden">↑ 相手が操作中 ↑</div>
+          <h3>相手が推測する文章</h3>
+          <div id="opponent-guess-board" class="char-board"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

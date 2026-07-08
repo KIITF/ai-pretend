@@ -1,24 +1,18 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getDatabase, ref, set, onValue, onDisconnect, get, update, remove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+// games/ai-narisumashi/app.js
 
-const firebaseConfig = {
-    apiKey: "AIzaSyA9S9ZHfeZ0MFL32ihEJpndYvZKT_2rfJI",
-    authDomain: "ai-pretend.firebaseapp.com",
-    databaseURL: "https://ai-pretend-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "ai-pretend",
-    storageBucket: "ai-pretend.firebasestorage.app",
-    messagingSenderId: "248259351182",
-    appId: "1:248259351182:web:29b8f3d9a60069a8daefdf",
-    measurementId: "G-GD8KLC1VT6"
-};
+// firebase-app.js のインポートと設定部分は削除し、必要な関数のみインポートする
+import { ref, set, onValue, onDisconnect, get, update, remove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// プロジェクトルートの共通設定から db インスタンスを読み込む
+import { db } from "../../firebase-config.js";
 
 let myName = "";
 let currentDeadline = 0;
 let currentPhase = '';
 const TIME_LIMIT_MS = 60000; // 60秒
+
+// （以降の処理は元のコードのまま変更なし）
 
 // タイマー監視ループ（1秒ごと）
 setInterval(() => {
